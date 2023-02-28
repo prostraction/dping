@@ -1,4 +1,4 @@
-# Detailed Ping Go (Go 1.17)
+# Detailed Ping Go (Go 1.17+)
 Simple ICMP ping tester with packet loss shown while running.
 
 To do:
