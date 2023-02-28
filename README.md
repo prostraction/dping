@@ -1,5 +1,5 @@
 # Detailed Ping Go (Go 1.17)
-Simple ICMP ping tester with packet loss shown while running
+Simple ICMP ping tester with packet loss shown while running.
 
 To do:
 - Set timeout from argv
@@ -24,7 +24,6 @@ go run main.go
 ```
 
 ICMP connection may require superuser privileges. If you encountered an error like `listen ip4:icmp 0.0.0.0: socket: operation not permitted` try:
-
 ```
 sudo go run main.go
 ```
