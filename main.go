@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
+// Contains collected pings
 type Queue struct {
 	items []map[int]int
 }
@@ -27,116 +28,116 @@ func (q *Queue) Pop() map[int]int {
 	return item
 }
 
-var ip_adr = "127.0.0.1"
+var ipAdr = "127.0.0.1"
 
-var seconds_passed int
-var queue_min Queue
-var queue_hour Queue
-var queue_3_hour Queue
-var stats_second map[int]int
-var stats_min map[int]int
-var stats_hour map[int]int
-var stats_3_hour map[int]int
-var stats_all map[int]int
+var secondsPassed int
+var queueMin Queue
+var queueHour Queue
+var queue3Hour Queue
+var statsSecond map[int]int
+var statsMin map[int]int
+var statsHour map[int]int
+var stats3Hour map[int]int
+var statsAll map[int]int
 
 // var seq int
 var mu sync.Mutex
 
 func log() {
-	t_min_check := time.Now()
-	t_last := time.Now()
+	tMinCheck := time.Now()
+	tLast := time.Now()
 	for {
-		t_now := time.Now()
-		if t_now.Second()-t_last.Second() != 0 {
+		tNow := time.Now()
+		if tNow.Second()-tLast.Second() != 0 {
 			mu.Lock()
-			seconds_passed++
+			secondsPassed++
 
-			queue_min.Push(stats_second)
-			queue_hour.Push(stats_second)
-			queue_3_hour.Push(stats_second)
+			queueMin.Push(statsSecond)
+			queueHour.Push(statsSecond)
+			queue3Hour.Push(statsSecond)
 
-			if seconds_passed >= 60 {
-				rem_old_sec := queue_min.Pop()
-				for k, v := range rem_old_sec {
-					if stats_min[k] > 0 {
-						stats_min[k] -= v
+			if secondsPassed >= 60 {
+				remOldSec := queueMin.Pop()
+				for k, v := range remOldSec {
+					if statsMin[k] > 0 {
+						statsMin[k] -= v
 					}
 				}
 			}
-			if seconds_passed >= 3600 {
-				rem_old_sec := queue_hour.Pop()
-				for k, v := range rem_old_sec {
-					if stats_hour[k] > 0 {
-						stats_hour[k] -= v
+			if secondsPassed >= 3600 {
+				remOldSec := queueHour.Pop()
+				for k, v := range remOldSec {
+					if statsHour[k] > 0 {
+						statsHour[k] -= v
 					}
 				}
 			}
-			if seconds_passed >= 3*3600 {
-				rem_old_sec := queue_3_hour.Pop()
-				for k, v := range rem_old_sec {
-					if stats_3_hour[k] > 0 {
-						stats_3_hour[k] -= v
+			if secondsPassed >= 3*3600 {
+				remOldSec := queue3Hour.Pop()
+				for k, v := range remOldSec {
+					if stats3Hour[k] > 0 {
+						stats3Hour[k] -= v
 					}
 				}
 			}
 
-			stats_second = nil
+			statsSecond = nil
 			mu.Unlock()
-			t_last = t_now
+			tLast = tNow
 		}
-		if t_now.Minute()-t_min_check.Minute() != 0 {
+		if tNow.Minute()-tMinCheck.Minute() != 0 {
 			mu.Lock()
-			strTime := t_now.Format(time.Stamp)
-			all_packets_min := 0
-			all_packets_hour := 0
-			all_packets_3_hour := 0
-			all_packets_all := 0
+			strTime := tNow.Format(time.Stamp)
+			allPacketsMin := 0
+			allPacketsHour := 0
+			allPackets3Hour := 0
+			allPacketsAll := 0
 
-			dropped_packets_min := 0
-			dropped_packets_hour := 0
-			dropped_packets_3_hour := 0
-			dropped_packets_all := 0
+			droppedPacketsMin := 0
+			droppedPacketsHour := 0
+			droppedPackets3Hour := 0
+			droppedPacketsAll := 0
 
-			for k, v := range stats_min {
-				if k >= 150 {
-					dropped_packets_min += v
+			for k, v := range statsMin {
+				if k >= 300 {
+					droppedPacketsMin += v
 				}
-				all_packets_min += v
+				allPacketsMin += v
 			}
-			for k, v := range stats_hour {
-				if k >= 150 {
-					dropped_packets_hour += v
+			for k, v := range statsHour {
+				if k >= 300 {
+					droppedPacketsHour += v
 				}
-				all_packets_hour += v
+				allPacketsHour += v
 			}
-			for k, v := range stats_3_hour {
-				if k >= 150 {
-					dropped_packets_3_hour += v
+			for k, v := range stats3Hour {
+				if k >= 300 {
+					droppedPackets3Hour += v
 				}
-				all_packets_3_hour += v
+				allPackets3Hour += v
 			}
-			for k, v := range stats_all {
-				if k >= 150 {
-					dropped_packets_all += v
+			for k, v := range statsAll {
+				if k >= 300 {
+					droppedPacketsAll += v
 				}
-				all_packets_all += v
+				allPacketsAll += v
 			}
-			if all_packets_min > 0 {
+			if allPacketsMin > 0 {
 				fmt.Printf("[%s]    loss M: [%.2f%% (%d of %d)], H: [%.2f%% (%d of %d)], 3H: [%.2f%% (%d of %d)], ALL: [%.2f%% (%d of %d)]\n", strTime,
-					100*float64(dropped_packets_min)/float64(all_packets_min),
-					dropped_packets_min, all_packets_min,
+					100*float64(droppedPacketsMin)/float64(allPacketsMin),
+					droppedPacketsMin, allPacketsMin,
 
-					100*float64(dropped_packets_hour)/float64(all_packets_hour),
-					dropped_packets_hour, all_packets_hour,
+					100*float64(droppedPacketsHour)/float64(allPacketsHour),
+					droppedPacketsHour, allPacketsHour,
 
-					100*float64(dropped_packets_3_hour)/float64(all_packets_3_hour),
-					dropped_packets_3_hour, all_packets_3_hour,
+					100*float64(droppedPackets3Hour)/float64(allPackets3Hour),
+					droppedPackets3Hour, allPackets3Hour,
 
-					100*float64(dropped_packets_all)/float64(all_packets_all),
-					dropped_packets_all, all_packets_all)
+					100*float64(droppedPacketsAll)/float64(allPacketsAll),
+					droppedPacketsAll, allPacketsAll)
 			}
 			mu.Unlock()
-			t_min_check = t_now
+			tMinCheck = tNow
 		}
 	}
 }
@@ -149,7 +150,7 @@ func test() {
 	}
 
 	connWrite.SetDeadline(time.Now().Add(time.Millisecond * 150))
-	ipAddr, err := net.ResolveIPAddr("ip4", ip_adr)
+	ipAddr, err := net.ResolveIPAddr("ip4", ipAdr)
 	if err != nil {
 		fmt.Println(err)
 		//log.Fatal(err)
@@ -175,7 +176,7 @@ func test() {
 		//log.Fatal(err)
 	}
 
-	t_begin := time.Now()
+	tBegin := time.Now()
 
 	buf := make([]byte, 1500)
 	n, _, _ := connWrite.ReadFrom(buf)
@@ -199,17 +200,17 @@ func test() {
 			//log.Fatalf("got %v; want %v", replyMsg.Type, ipv4.ICMPTypeEchoReply)
 		}
 	*/
-	t_last := time.Now()
+	tLast := time.Now()
 	mu.Lock()
-	if stats_second == nil {
-		stats_second = make(map[int]int)
+	if statsSecond == nil {
+		statsSecond = make(map[int]int)
 	}
-	latency := t_last.UnixMilli() - t_begin.UnixMilli()
-	stats_second[int(latency)]++
-	stats_hour[int(latency)]++
-	stats_3_hour[int(latency)]++
-	stats_min[int(latency)]++
-	stats_all[int(latency)]++
+	latency := tLast.UnixMilli() - tBegin.UnixMilli()
+	statsSecond[int(latency)]++
+	statsHour[int(latency)]++
+	stats3Hour[int(latency)]++
+	statsMin[int(latency)]++
+	statsAll[int(latency)]++
 	//if stats_min == nil {
 	//	stats_min = make(map[int64]int64)
 	//}
@@ -221,16 +222,16 @@ func test() {
 }
 
 func main() {
-	queue_min = Queue{}
-	queue_hour = Queue{}
-	queue_3_hour = Queue{}
+	queueMin = Queue{}
+	queueHour = Queue{}
+	queue3Hour = Queue{}
 
-	seconds_passed = 0
-	stats_second = make(map[int]int)
-	stats_hour = make(map[int]int)
-	stats_3_hour = make(map[int]int)
-	stats_min = make(map[int]int)
-	stats_all = make(map[int]int)
+	secondsPassed = 0
+	statsSecond = make(map[int]int)
+	statsHour = make(map[int]int)
+	stats3Hour = make(map[int]int)
+	statsMin = make(map[int]int)
+	statsAll = make(map[int]int)
 	go log()
 	for {
 		test()
