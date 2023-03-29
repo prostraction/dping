@@ -1,22 +1,10 @@
 # Detailed Ping Go (Go 1.17+)
 Simple ICMP ping tester with packet loss shown while running.
 
-To do:
--   Set timeout from argv
--   Set log timing from argv
--   Set ip from argv
--   More nice view of log
--   Logging latency (ms)
--   Logging "---" instead hour and 3-hour if program running less then hour
-
-
 Configure:
 ```
 git clone https://github.com/prostraction/Detailed-Ping-Go
 cd Detailed-Ping-Go
-go get -u github.com/logrusorgru/aurora/v4
-go mod init main.go
-go mod tidy
 ```
 
 Run:
