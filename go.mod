@@ -1,4 +1,4 @@
-module main.go
+module dping.go
 
 go 1.20
 

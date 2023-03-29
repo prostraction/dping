@@ -1,4 +1,4 @@
-package main
+package main // dping.go
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/logrusorgru/aurora/v4"
-	. "github.com/mattn/go-colorable"
+	"github.com/mattn/go-colorable"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -117,9 +117,8 @@ func firstCommaPrint(firstOut *bool) string {
 	if *firstOut {
 		*firstOut = false
 		return ""
-	} else {
-		return ", "
 	}
+	return ", "
 }
 
 func printMsg(strTime string) {
@@ -399,7 +398,7 @@ func printHelp() {
 
 func main() {
 	if runtime.GOOS == "windows" {
-		out = NewColorableStdout()
+		out = colorable.NewColorableStdout()
 	} else {
 		out = os.Stdout
 	}
