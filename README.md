@@ -14,6 +14,7 @@ Configure:
 ```
 git clone https://github.com/prostraction/Detailed-Ping-Go
 cd Detailed-Ping-Go
+go get -u github.com/logrusorgru/aurora/v4
 go mod init main.go
 go mod tidy
 ```

@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/logrusorgru/aurora/v4"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -32,20 +34,98 @@ func (q *Queue) Pop() map[int]int {
 	return item
 }
 
-var ipAdr = ""
+// PacketsLog used for printing final results
+type PacketsLog struct {
+	allPacketsMin       int
+	allPacketsHour      int
+	allPackets3Hour     int
+	allPacketsAll       int
+	droppedPacketsMin   int
+	droppedPacketsHour  int
+	droppedPackets3Hour int
+	droppedPacketsAll   int
+}
 
+var p PacketsLog
+
+/* For more readable code */
+const second = 1
+const minute = 60
+const hour = 3600
+
+/* Sets by arguments or have default values */
+var ipAdr = ""
+var timeout = 300
+
+/* Logging options */
+var logHourEnabled = false
+var log3HourEnabled = false
+var logShowPacketsCount = false
+var logInterval = minute
+
+/* Used for collect second's ping data */
 var secondsPassed int
 var queueMin Queue
 var queueHour Queue
 var queue3Hour Queue
+
+/* Used for processing ping data */
 var statsSecond map[int]int
 var statsMin map[int]int
 var statsHour map[int]int
 var stats3Hour map[int]int
 var statsAll map[int]int
 
-// var seq int
+/* Used for logging */
 var mu sync.Mutex
+
+func colorizeStats(value float64) string {
+	if value < 2 {
+		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Green(value))
+	} else if value < 10 {
+		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Yellow(value))
+	} else {
+		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Red(value))
+	}
+}
+
+func printMsg(strTime string) {
+	var msg = ""
+	msg += "[" + strTime + "]\t"
+
+	msg += "Loss min: "
+	minStats := 100 * float64(p.droppedPacketsMin) / float64(p.allPacketsMin)
+	msg += colorizeStats(minStats)
+	if logShowPacketsCount {
+		msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsMin, p.allPacketsMin)
+	}
+
+	if logHourEnabled {
+		msg += ", hour: "
+		hourStats := 100 * float64(p.droppedPacketsHour) / float64(p.allPacketsHour)
+		msg += colorizeStats(hourStats)
+		if logShowPacketsCount {
+			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsHour, p.allPacketsHour)
+		}
+	}
+	if log3HourEnabled {
+		msg += ", 3 hours: "
+		threeHoursStats := 100 * float64(p.droppedPackets3Hour) / float64(p.allPackets3Hour)
+		msg += colorizeStats(threeHoursStats)
+		if logShowPacketsCount {
+			msg += fmt.Sprintf(" (%d of %d)", p.droppedPackets3Hour, p.allPackets3Hour)
+		}
+	}
+	msg += ", all: "
+
+	allStats := 100 * float64(p.droppedPacketsAll) / float64(p.allPacketsAll)
+	msg += colorizeStats(allStats)
+	if logShowPacketsCount {
+		msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsAll, p.allPacketsAll)
+	}
+
+	fmt.Println(msg)
+}
 
 func log() {
 	tMinCheck := time.Now()
@@ -60,7 +140,7 @@ func log() {
 			queueHour.Push(statsSecond)
 			queue3Hour.Push(statsSecond)
 
-			if secondsPassed >= 60 {
+			if secondsPassed >= minute {
 				remOldSec := queueMin.Pop()
 				for k, v := range remOldSec {
 					if statsMin[k] > 0 {
@@ -68,7 +148,7 @@ func log() {
 					}
 				}
 			}
-			if secondsPassed >= 3600 {
+			if secondsPassed >= hour {
 				remOldSec := queueHour.Pop()
 				for k, v := range remOldSec {
 					if statsHour[k] > 0 {
@@ -76,7 +156,7 @@ func log() {
 					}
 				}
 			}
-			if secondsPassed >= 3*3600 {
+			if secondsPassed >= 3*hour {
 				remOldSec := queue3Hour.Pop()
 				for k, v := range remOldSec {
 					if stats3Hour[k] > 0 {
@@ -89,56 +169,46 @@ func log() {
 			mu.Unlock()
 			tLast = tNow
 		}
-		if tNow.Minute()-tMinCheck.Minute() != 0 {
+		if tNow.Unix()-tMinCheck.Unix() >= int64(logInterval) {
+			//if tNow.Minute()-tMinCheck.Minute() != 0 {
 			mu.Lock()
 			strTime := tNow.Format(time.Stamp)
-			allPacketsMin := 0
-			allPacketsHour := 0
-			allPackets3Hour := 0
-			allPacketsAll := 0
 
-			droppedPacketsMin := 0
-			droppedPacketsHour := 0
-			droppedPackets3Hour := 0
-			droppedPacketsAll := 0
+			p.allPacketsMin = 0
+			p.allPacketsHour = 0
+			p.allPackets3Hour = 0
+			p.allPacketsAll = 0
+			p.droppedPacketsMin = 0
+			p.droppedPacketsHour = 0
+			p.droppedPackets3Hour = 0
+			p.droppedPacketsAll = 0
 
 			for k, v := range statsMin {
-				if k >= 300 {
-					droppedPacketsMin += v
+				if k >= timeout {
+					p.droppedPacketsMin += v
 				}
-				allPacketsMin += v
+				p.allPacketsMin += v
 			}
 			for k, v := range statsHour {
-				if k >= 300 {
-					droppedPacketsHour += v
+				if k >= timeout {
+					p.droppedPacketsHour += v
 				}
-				allPacketsHour += v
+				p.allPacketsHour += v
 			}
 			for k, v := range stats3Hour {
-				if k >= 300 {
-					droppedPackets3Hour += v
+				if k >= timeout {
+					p.droppedPackets3Hour += v
 				}
-				allPackets3Hour += v
+				p.allPackets3Hour += v
 			}
 			for k, v := range statsAll {
-				if k >= 300 {
-					droppedPacketsAll += v
+				if k >= timeout {
+					p.droppedPacketsAll += v
 				}
-				allPacketsAll += v
+				p.allPacketsAll += v
 			}
-			if allPacketsMin > 0 {
-				fmt.Printf("[%s]    loss M: [%.2f%% (%d of %d)], H: [%.2f%% (%d of %d)], 3H: [%.2f%% (%d of %d)], ALL: [%.2f%% (%d of %d)]\n", strTime,
-					100*float64(droppedPacketsMin)/float64(allPacketsMin),
-					droppedPacketsMin, allPacketsMin,
-
-					100*float64(droppedPacketsHour)/float64(allPacketsHour),
-					droppedPacketsHour, allPacketsHour,
-
-					100*float64(droppedPackets3Hour)/float64(allPackets3Hour),
-					droppedPackets3Hour, allPackets3Hour,
-
-					100*float64(droppedPacketsAll)/float64(allPacketsAll),
-					droppedPacketsAll, allPacketsAll)
+			if p.allPacketsMin > 0 {
+				printMsg(strTime)
 			}
 			mu.Unlock()
 			tMinCheck = tNow
@@ -152,6 +222,9 @@ func test() error {
 		return err
 	}
 
+	// Used const 150ms value for connection
+	// Overwise some strange behavior on lower values could happens
+	// Example: on 2ms timeout there is 50% packet loss, but in fact it must be 100%
 	connWrite.SetDeadline(time.Now().Add(time.Millisecond * 150))
 	ipAddr, err := net.ResolveIPAddr("ip4", ipAdr)
 	if err != nil {
@@ -203,11 +276,14 @@ func printHelp() {
 	fmt.Println("USAGE: det-ping IPv4 [arguments]")
 	//fmt.Println("IP address must be writen as IPv4 like 1.1.1.1 or 127.0.0.1.")
 	fmt.Println("Available arguments: ")
-	fmt.Println("-t [msec] or --timeout [msec]. (default -t 300)")
+	fmt.Println("-t [msec] or --timeout [msec]\tSet timeout for packets.\t\t(default msec=300)")
+	fmt.Println("-i s/m/h or --interval s/m/h\tSet logging interval to sec/min/hour.\t(default i=m)")
+	fmt.Println("-h or --hour\t\t\tEnable logging hour drop stats. \t(default disabled)")
+	fmt.Println("-3h or --3hour\t\t\tEnable logging 3 hour drop stats \t(default disabled)")
+	fmt.Println("-p or --packets\t\t\tEnable logging packets count stats. \t(default disabled)")
 }
 
 func main() {
-
 	argsGiven := os.Args[1:]
 	if len(argsGiven) < 1 {
 		printHelp()
@@ -219,21 +295,59 @@ func main() {
 	} else {
 		ipAdr = argsGiven[0]
 	}
-	for i := 1; i < len(argsGiven); i += 2 {
-		if i+1 < len(argsGiven) {
-			fmt.Println(argsGiven[i], argsGiven[i+1])
-			switch argsGiven[i] {
-			case "-t":
-				fallthrough
-			case "--timeout":
-				fmt.Println("TIMEOUT: ", argsGiven[i+1])
-			default:
-				fmt.Println("Unrecongnized command:", argsGiven[i])
+	for i := 1; i < len(argsGiven); i++ {
+		fmt.Println(argsGiven[i])
+		switch argsGiven[i] {
+		case "-t":
+			fallthrough
+		case "--timeout":
+			if i+1 < len(argsGiven) {
+				var err error
+				timeout, err = strconv.Atoi(argsGiven[i+1])
+				if err != nil {
+					fmt.Println(err.Error())
+					return
+				}
+				i++
+			} else {
+				fmt.Println(argsGiven[i], "requeires an argument")
 				printHelp()
 				return
 			}
-		} else {
-			fmt.Println(argsGiven[i], "requires an argument.")
+		case "-i":
+			fallthrough
+		case "--interval":
+			if i+1 < len(argsGiven) {
+				if argsGiven[i+1] == "s" {
+					logInterval = second
+				} else if argsGiven[i+1] == "m" {
+					logInterval = minute
+				} else if argsGiven[i+1] == "h" {
+					logInterval = hour
+				} else {
+					fmt.Println(argsGiven[i], "accepts only 's', 'm' or 'h' argument (second, minute or hour)")
+					return
+				}
+				i++
+			} else {
+				fmt.Println(argsGiven[i], "requeires an argument")
+				printHelp()
+				return
+			}
+		case "-h":
+			fallthrough
+		case "--hour":
+			logHourEnabled = true
+		case "-3h":
+			fallthrough
+		case "--3hour":
+			log3HourEnabled = true
+		case "-p":
+			fallthrough
+		case "--packets":
+			logShowPacketsCount = true
+		default:
+			fmt.Println("Unrecongnized argument:", argsGiven[i])
 			printHelp()
 			return
 		}
