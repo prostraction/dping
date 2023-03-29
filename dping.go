@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/logrusorgru/aurora/v4"
+	. "github.com/mattn/go-colorable"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -88,6 +91,7 @@ var statsAll map[int]int
 
 /* Used for logging */
 var mu sync.Mutex
+var out io.Writer
 
 func colorizeLoss(value float64) string {
 	if value < 2 {
@@ -97,6 +101,7 @@ func colorizeLoss(value float64) string {
 	} else {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Red(value))
 	}
+
 }
 func colorizeLatency(value int) string {
 	if value < 50 {
@@ -193,7 +198,7 @@ func printMsg(strTime string) {
 	msg += "all: "
 	msg += colorizeLatency(p.avgLatencyAll)
 
-	fmt.Println(msg)
+	fmt.Fprintln(out, msg)
 }
 
 func log() {
@@ -393,6 +398,11 @@ func printHelp() {
 }
 
 func main() {
+	if runtime.GOOS == "windows" {
+		out = NewColorableStdout()
+	} else {
+		out = os.Stdout
+	}
 	argsGiven := os.Args[1:]
 	if len(argsGiven) < 1 {
 		printHelp()
