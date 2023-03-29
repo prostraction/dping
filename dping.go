@@ -197,11 +197,11 @@ func printMsg(strTime string) {
 }
 
 func log() {
-	tMinCheck := time.Now()
+	tIntervalCheck := time.Now()
 	tLast := time.Now()
 	for {
 		tNow := time.Now()
-		if tNow.Second()-tLast.Second() != 0 {
+		if tNow.Unix()-tLast.Unix() >= int64(second) {
 			mu.Lock()
 			secondsPassed++
 
@@ -239,7 +239,7 @@ func log() {
 			mu.Unlock()
 			tLast = tNow
 		}
-		if tNow.Unix()-tMinCheck.Unix() >= int64(logInterval) {
+		if tNow.Unix()-tIntervalCheck.Unix() >= int64(logInterval) {
 			//if tNow.Minute()-tMinCheck.Minute() != 0 {
 			mu.Lock()
 			strTime := tNow.Format(time.Stamp)
@@ -319,7 +319,7 @@ func log() {
 				printMsg(strTime)
 			}
 			mu.Unlock()
-			tMinCheck = tNow
+			tIntervalCheck = tNow
 		}
 	}
 }
