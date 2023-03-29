@@ -35,3 +35,5 @@ Available arguments:
 -   `-h` or `--hour`                    Enable logging hour drop stats.       (default enabled, if `i = h`)
 -   `-3h` or `--3hour`                  Enable logging 3 hour drop stats      (default disabled)
 -   `-p` or `--packets`                 Enable logging packets count stats.   (default disabled)
+
+![dping1](https://user-images.githubusercontent.com/47314760/228662207-9087bc7f-4bbf-4db1-ba3e-96281048723a.PNG)
