@@ -1,30 +1,41 @@
 # Detailed Ping Go (Go 1.17+)
 Simple ICMP ping tester with packet loss shown while running.
 
-To do:
--   Set timeout from argv
--   Set log timing from argv
--   Set ip from argv
--   More nice view of log
--   Logging latency (ms)
--   Logging "---" instead hour and 3-hour if program running less then hour
-
-
-Configure:
+Get project:
 ```
 git clone https://github.com/prostraction/Detailed-Ping-Go
 cd Detailed-Ping-Go
-go get -u github.com/logrusorgru/aurora/v4
-go mod init main.go
-go mod tidy
 ```
 
 Run:
 ```
-go run main.go
+go run dping.go
+```
+
+Build:
+```
+go build -o bin/dping.exe
 ```
 
 ICMP connection may require superuser privileges. If you encountered an error like `listen ip4:icmp 0.0.0.0: socket: operation not permitted` try:
 ```
-sudo go run main.go
+sudo go run dping.go
 ```
+
+Usage: 
+```
+dping IPv4 [arguments]
+```
+
+Available arguments:
+-   `-t [msec]` or `--timeout [msec]`   Set timeout for packets.              (default msec = `300`)
+-   `-i s/m/h` or `--interval s/m/h`    Set logging interval to sec/min/hour. (default `i = m`)
+-   `-s` or `--second`                  Enable logging second drop stats.     (default enabled, if `i = s`)
+-   `-m` or `--min`                     Enable logging minute drop stats.     (default enabled, if `i = m`)
+-   `-h` or `--hour`                    Enable logging hour drop stats.       (default enabled, if `i = h`)
+-   `-3h` or `--3hour`                  Enable logging 3 hour drop stats      (default disabled)
+-   `-p` or `--packets`                 Enable logging packets count stats.   (default disabled)
+
+
+
+![dping1](https://user-images.githubusercontent.com/47314760/228662319-5ebdf4c5-61ef-49d2-a778-c048cc980aad.PNG)
