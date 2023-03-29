@@ -36,14 +36,21 @@ func (q *Queue) Pop() map[int]int {
 
 // PacketsLog used for printing final results
 type PacketsLog struct {
-	allPacketsMin       int
-	allPacketsHour      int
-	allPackets3Hour     int
-	allPacketsAll       int
-	droppedPacketsMin   int
-	droppedPacketsHour  int
-	droppedPackets3Hour int
-	droppedPacketsAll   int
+	allPacketsSecond     int
+	allPacketsMin        int
+	allPacketsHour       int
+	allPackets3Hour      int
+	allPacketsAll        int
+	droppedPacketsSecond int
+	droppedPacketsMin    int
+	droppedPacketsHour   int
+	droppedPackets3Hour  int
+	droppedPacketsAll    int
+	avgLatencySecond     int
+	avgLatencyMin        int
+	avgLatencyHour       int
+	avgLatency3Hour      int
+	avgLatencyAll        int
 }
 
 var p PacketsLog
@@ -58,6 +65,8 @@ var ipAdr = ""
 var timeout = 300
 
 /* Logging options */
+var logSecondEnabled = false
+var logMinuteEnabled = false
 var logHourEnabled = false
 var log3HourEnabled = false
 var logShowPacketsCount = false
@@ -65,13 +74,14 @@ var logInterval = minute
 
 /* Used for collect second's ping data */
 var secondsPassed int
-var queueMin Queue
+var queueMinute Queue
 var queueHour Queue
 var queue3Hour Queue
 
 /* Used for processing ping data */
+var dataSecond map[int]int
 var statsSecond map[int]int
-var statsMin map[int]int
+var statsMinute map[int]int
 var statsHour map[int]int
 var stats3Hour map[int]int
 var statsAll map[int]int
@@ -79,7 +89,7 @@ var statsAll map[int]int
 /* Used for logging */
 var mu sync.Mutex
 
-func colorizeStats(value float64) string {
+func colorizeLoss(value float64) string {
 	if value < 2 {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Green(value))
 	} else if value < 10 {
@@ -88,41 +98,100 @@ func colorizeStats(value float64) string {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Red(value))
 	}
 }
+func colorizeLatency(value int) string {
+	if value < 50 {
+		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Green(value))
+	} else if value < 150 {
+		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Yellow(value))
+	} else {
+		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Red(value))
+	}
+}
+
+func firstCommaPrint(firstOut *bool) string {
+	if *firstOut {
+		*firstOut = false
+		return ""
+	} else {
+		return ", "
+	}
+}
 
 func printMsg(strTime string) {
+	var firstOut bool
+	firstOut = true
 	var msg = ""
 	msg += "[" + strTime + "]\t"
-
-	msg += "Loss min: "
-	minStats := 100 * float64(p.droppedPacketsMin) / float64(p.allPacketsMin)
-	msg += colorizeStats(minStats)
-	if logShowPacketsCount {
-		msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsMin, p.allPacketsMin)
+	msg += "Loss: "
+	if logSecondEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "sec: "
+		secondStats := 100 * float64(p.droppedPacketsSecond) / float64(p.allPacketsSecond)
+		msg += colorizeLoss(secondStats)
+		if logShowPacketsCount {
+			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsSecond, p.allPacketsSecond)
+		}
 	}
-
+	if logMinuteEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "min: "
+		minStats := 100 * float64(p.droppedPacketsMin) / float64(p.allPacketsMin)
+		msg += colorizeLoss(minStats)
+		if logShowPacketsCount {
+			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsMin, p.allPacketsMin)
+		}
+	}
 	if logHourEnabled {
-		msg += ", hour: "
+		msg += firstCommaPrint(&firstOut)
+		msg += "hour: "
 		hourStats := 100 * float64(p.droppedPacketsHour) / float64(p.allPacketsHour)
-		msg += colorizeStats(hourStats)
+		msg += colorizeLoss(hourStats)
 		if logShowPacketsCount {
 			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsHour, p.allPacketsHour)
 		}
 	}
 	if log3HourEnabled {
-		msg += ", 3 hours: "
+		msg += firstCommaPrint(&firstOut)
+		msg += "3 hours: "
 		threeHoursStats := 100 * float64(p.droppedPackets3Hour) / float64(p.allPackets3Hour)
-		msg += colorizeStats(threeHoursStats)
+		msg += colorizeLoss(threeHoursStats)
 		if logShowPacketsCount {
 			msg += fmt.Sprintf(" (%d of %d)", p.droppedPackets3Hour, p.allPackets3Hour)
 		}
 	}
-	msg += ", all: "
-
+	msg += firstCommaPrint(&firstOut)
+	msg += "all: "
 	allStats := 100 * float64(p.droppedPacketsAll) / float64(p.allPacketsAll)
-	msg += colorizeStats(allStats)
+	msg += colorizeLoss(allStats)
 	if logShowPacketsCount {
 		msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsAll, p.allPacketsAll)
 	}
+
+	firstOut = true
+	msg += "\tLatency: "
+	if logSecondEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "sec: "
+		msg += colorizeLatency(p.avgLatencySecond)
+	}
+	if logMinuteEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "min: "
+		msg += colorizeLatency(p.avgLatencyMin)
+	}
+	if logHourEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "hour: "
+		msg += colorizeLatency(p.avgLatencyHour)
+	}
+	if log3HourEnabled {
+		msg += firstCommaPrint(&firstOut)
+		msg += "3 hours: "
+		msg += colorizeLatency(p.avgLatency3Hour)
+	}
+	msg += firstCommaPrint(&firstOut)
+	msg += "all: "
+	msg += colorizeLatency(p.avgLatencyAll)
 
 	fmt.Println(msg)
 }
@@ -136,15 +205,16 @@ func log() {
 			mu.Lock()
 			secondsPassed++
 
-			queueMin.Push(statsSecond)
-			queueHour.Push(statsSecond)
-			queue3Hour.Push(statsSecond)
+			statsSecond = dataSecond
+			queueMinute.Push(dataSecond)
+			queueHour.Push(dataSecond)
+			queue3Hour.Push(dataSecond)
 
 			if secondsPassed >= minute {
-				remOldSec := queueMin.Pop()
+				remOldSec := queueMinute.Pop()
 				for k, v := range remOldSec {
-					if statsMin[k] > 0 {
-						statsMin[k] -= v
+					if statsMinute[k] > 0 {
+						statsMinute[k] -= v
 					}
 				}
 			}
@@ -165,7 +235,7 @@ func log() {
 				}
 			}
 
-			statsSecond = nil
+			dataSecond = nil
 			mu.Unlock()
 			tLast = tNow
 		}
@@ -174,39 +244,62 @@ func log() {
 			mu.Lock()
 			strTime := tNow.Format(time.Stamp)
 
+			p.allPacketsSecond = 0
 			p.allPacketsMin = 0
 			p.allPacketsHour = 0
 			p.allPackets3Hour = 0
 			p.allPacketsAll = 0
+			p.droppedPacketsSecond = 0
 			p.droppedPacketsMin = 0
 			p.droppedPacketsHour = 0
 			p.droppedPackets3Hour = 0
 			p.droppedPacketsAll = 0
+			p.avgLatencySecond = 0
+			p.avgLatencyMin = 0
+			p.avgLatencyHour = 0
+			p.avgLatency3Hour = 0
+			p.avgLatencyAll = 0
 
-			for k, v := range statsMin {
+			for k, v := range statsSecond {
+				if k >= timeout {
+					p.droppedPacketsSecond += v
+				}
+				p.avgLatencySecond += k * v
+				p.allPacketsSecond += v
+			}
+			p.avgLatencySecond /= p.allPacketsSecond
+			for k, v := range statsMinute {
 				if k >= timeout {
 					p.droppedPacketsMin += v
 				}
+				p.avgLatencyMin += k * v
 				p.allPacketsMin += v
 			}
+			p.avgLatencyMin /= p.allPacketsMin
 			for k, v := range statsHour {
 				if k >= timeout {
 					p.droppedPacketsHour += v
 				}
+				p.avgLatencyHour += k * v
 				p.allPacketsHour += v
 			}
+			p.avgLatencyHour /= p.allPacketsHour
 			for k, v := range stats3Hour {
 				if k >= timeout {
 					p.droppedPackets3Hour += v
 				}
+				p.avgLatency3Hour += k * v
 				p.allPackets3Hour += v
 			}
+			p.avgLatency3Hour /= p.allPackets3Hour
 			for k, v := range statsAll {
 				if k >= timeout {
 					p.droppedPacketsAll += v
 				}
+				p.avgLatencyAll += k * v
 				p.allPacketsAll += v
 			}
+			p.avgLatencyAll /= p.allPacketsAll
 			if p.allPacketsMin > 0 {
 				printMsg(strTime)
 			}
@@ -258,14 +351,14 @@ func test() error {
 	}
 	tLast := time.Now()
 	mu.Lock()
-	if statsSecond == nil {
-		statsSecond = make(map[int]int)
+	if dataSecond == nil {
+		dataSecond = make(map[int]int)
 	}
 	latency := tLast.UnixMilli() - tBegin.UnixMilli()
-	statsSecond[int(latency)]++
+	dataSecond[int(latency)]++
 	statsHour[int(latency)]++
 	stats3Hour[int(latency)]++
-	statsMin[int(latency)]++
+	statsMinute[int(latency)]++
 	statsAll[int(latency)]++
 	mu.Unlock()
 	connWrite.Close()
@@ -274,11 +367,12 @@ func test() error {
 
 func printHelp() {
 	fmt.Println("USAGE: det-ping IPv4 [arguments]")
-	//fmt.Println("IP address must be writen as IPv4 like 1.1.1.1 or 127.0.0.1.")
 	fmt.Println("Available arguments: ")
-	fmt.Println("-t [msec] or --timeout [msec]\tSet timeout for packets.\t\t(default msec=300)")
-	fmt.Println("-i s/m/h or --interval s/m/h\tSet logging interval to sec/min/hour.\t(default i=m)")
-	fmt.Println("-h or --hour\t\t\tEnable logging hour drop stats. \t(default disabled)")
+	fmt.Println("-t [msec] or --timeout [msec]\tSet timeout for packets.\t\t(default msec = 300)")
+	fmt.Println("-i s/m/h or --interval s/m/h\tSet logging interval to sec/min/hour.\t(default i = m)")
+	fmt.Println("-s or --second\t\t\tEnable logging second drop stats. \t(default enabled, if i = s)")
+	fmt.Println("-m or --min\t\t\tEnable logging minute drop stats. \t(default enabled, if i = m)")
+	fmt.Println("-h or --hour\t\t\tEnable logging hour drop stats. \t(default enabled, if i = h)")
 	fmt.Println("-3h or --3hour\t\t\tEnable logging 3 hour drop stats \t(default disabled)")
 	fmt.Println("-p or --packets\t\t\tEnable logging packets count stats. \t(default disabled)")
 }
@@ -296,7 +390,6 @@ func main() {
 		ipAdr = argsGiven[0]
 	}
 	for i := 1; i < len(argsGiven); i++ {
-		fmt.Println(argsGiven[i])
 		switch argsGiven[i] {
 		case "-t":
 			fallthrough
@@ -334,6 +427,14 @@ func main() {
 				printHelp()
 				return
 			}
+		case "-s":
+			fallthrough
+		case "--second":
+			logSecondEnabled = true
+		case "-m":
+			fallthrough
+		case "--min":
+			logMinuteEnabled = true
 		case "-h":
 			fallthrough
 		case "--hour":
@@ -352,16 +453,23 @@ func main() {
 			return
 		}
 	}
+	if logInterval == second {
+		logSecondEnabled = true
+	} else if logInterval == minute {
+		logMinuteEnabled = true
+	} else if logInterval == hour {
+		logHourEnabled = true
+	}
 
-	queueMin = Queue{}
+	queueMinute = Queue{}
 	queueHour = Queue{}
 	queue3Hour = Queue{}
 
 	secondsPassed = 0
-	statsSecond = make(map[int]int)
+	dataSecond = make(map[int]int)
 	statsHour = make(map[int]int)
 	stats3Hour = make(map[int]int)
-	statsMin = make(map[int]int)
+	statsMinute = make(map[int]int)
 	statsAll = make(map[int]int)
 	go log()
 	for {
