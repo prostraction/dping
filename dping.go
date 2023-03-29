@@ -1,4 +1,5 @@
-package main // dping.go
+// Program Detailed-Ping-Go is used for collectiog ping's results
+package main
 
 import (
 	"fmt"
@@ -94,9 +95,9 @@ var mu sync.Mutex
 var out io.Writer
 
 func colorizeLoss(value float64) string {
-	if value < 2 {
+	if value < 1 {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Green(value))
-	} else if value < 10 {
+	} else if value < 5 {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Yellow(value))
 	} else {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Red(value))
@@ -104,9 +105,9 @@ func colorizeLoss(value float64) string {
 
 }
 func colorizeLatency(value int) string {
-	if value < 50 {
+	if value < 60 {
 		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Green(value))
-	} else if value < 150 {
+	} else if value < 120 {
 		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Yellow(value))
 	} else {
 		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Red(value))
@@ -410,9 +411,8 @@ func main() {
 	if strings.Count(argsGiven[0], ".") != 3 {
 		printHelp()
 		return
-	} else {
-		ipAdr = argsGiven[0]
 	}
+	ipAdr = argsGiven[0]
 	for i := 1; i < len(argsGiven); i++ {
 		switch argsGiven[i] {
 		case "-t":
