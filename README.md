@@ -1,7 +1,7 @@
 # Detailed Ping Go (Go 1.17+)
 Simple ICMP ping tester with packet loss shown while running.
 
-Configure:
+Get project:
 ```
 git clone https://github.com/prostraction/Detailed-Ping-Go
 cd Detailed-Ping-Go
