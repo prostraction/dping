@@ -32,7 +32,7 @@ dping IPv4 [arguments]
 
 Available arguments:
 -   `-t [msec]` or `--timeout [msec]`   Set timeout for packets.              (default msec = `300`)
--   `-i s/m/h` or `--interval s/m/h`    Set logging interval to sec/min/hour. (default `i = m`)
+-   `-i s/m/h` or `--interval s/m/h`    Set logging interval to sec/min/hour. (default `i = s`)
 -   `-s` or `--second`                  Enable logging second drop stats.     (default enabled, if `i = s`)
 -   `-m` or `--min`                     Enable logging minute drop stats.     (default enabled, if `i = m`)
 -   `-h` or `--hour`                    Enable logging hour drop stats.       (default enabled, if `i = h`)
