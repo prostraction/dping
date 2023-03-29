@@ -74,7 +74,7 @@ var logMinuteEnabled = false
 var logHourEnabled = false
 var log3HourEnabled = false
 var logShowPacketsCount = false
-var logInterval = minute
+var logInterval = second
 
 /* Used for collect second's ping data */
 var secondsPassed int
@@ -389,7 +389,7 @@ func printHelp() {
 	fmt.Println("USAGE: dping IPv4 [arguments]")
 	fmt.Println("Available arguments: ")
 	fmt.Println("-t [msec] or --timeout [msec]\tSet timeout for packets.\t\t(default msec = 300)")
-	fmt.Println("-i s/m/h or --interval s/m/h\tSet logging interval to sec/min/hour.\t(default i = m)")
+	fmt.Println("-i s/m/h or --interval s/m/h\tSet logging interval to sec/min/hour.\t(default i = s)")
 	fmt.Println("-s or --second\t\t\tEnable logging second drop stats. \t(default enabled, if i = s)")
 	fmt.Println("-m or --min\t\t\tEnable logging minute drop stats. \t(default enabled, if i = m)")
 	fmt.Println("-h or --hour\t\t\tEnable logging hour drop stats. \t(default enabled, if i = h)")
