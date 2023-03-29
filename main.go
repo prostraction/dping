@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,14 +12,17 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-// Contains collected pings
+// Queue collects ping metrics for defined duration
 type Queue struct {
 	items []map[int]int
 }
 
+// Push adds current one second's ping metric to Queue
 func (q *Queue) Push(item map[int]int) {
 	q.items = append(q.items, item)
 }
+
+// Pop removes last n seconds (hours) ago ping metric from Queue
 func (q *Queue) Pop() map[int]int {
 	if len(q.items) == 0 {
 		return nil
@@ -28,7 +32,7 @@ func (q *Queue) Pop() map[int]int {
 	return item
 }
 
-var ipAdr = "127.0.0.1"
+var ipAdr = ""
 
 var secondsPassed int
 var queueMin Queue
@@ -142,18 +146,16 @@ func log() {
 	}
 }
 
-func test() {
+func test() error {
 	connWrite, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		fmt.Println(err)
-		//log.Fatal(err)
+		return err
 	}
 
 	connWrite.SetDeadline(time.Now().Add(time.Millisecond * 150))
 	ipAddr, err := net.ResolveIPAddr("ip4", ipAdr)
 	if err != nil {
-		fmt.Println(err)
-		//log.Fatal(err)
+		return err
 	}
 
 	msg := icmp.Message{
@@ -167,13 +169,11 @@ func test() {
 	}
 	msgBytes, err := msg.Marshal(nil)
 	if err != nil {
-		fmt.Println(err)
-		//log.Fatal(err)
+		return err
 	}
 
 	if _, err := connWrite.WriteTo(msgBytes, ipAddr); err != nil {
-		fmt.Println(err)
-		//log.Fatal(err)
+		return err
 	}
 
 	tBegin := time.Now()
@@ -183,23 +183,6 @@ func test() {
 	if n < 0 {
 		fmt.Println(n)
 	}
-	/*if err != nil {
-		log.Fatal(err)
-	}
-	if peer.String() != ipAddr.String() {
-		log.Fatalf("got reply from unexpected IP %s; want %s", peer, ipAddr)
-	}*/
-
-	/*
-		replyMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), buf[:n])
-		if err != nil {
-			fmt.Println(err)
-		}
-		if replyMsg.Type != ipv4.ICMPTypeEchoReply {
-			fmt.Println(err)
-			//log.Fatalf("got %v; want %v", replyMsg.Type, ipv4.ICMPTypeEchoReply)
-		}
-	*/
 	tLast := time.Now()
 	mu.Lock()
 	if statsSecond == nil {
@@ -211,17 +194,51 @@ func test() {
 	stats3Hour[int(latency)]++
 	statsMin[int(latency)]++
 	statsAll[int(latency)]++
-	//if stats_min == nil {
-	//	stats_min = make(map[int64]int64)
-	//}
-	//stats_min[t_last.UnixMilli()-t_begin.UnixMilli()]++
-	//stats_all[t_last.UnixMilli()-t_begin.UnixMilli()]++
 	mu.Unlock()
-	//fmt.Printf("Got ICMP packet: %+v (%d ms.)\n", replyMsg, t_last.UnixMilli()-t_begin.UnixMilli())
 	connWrite.Close()
+	return nil
+}
+
+func printHelp() {
+	fmt.Println("USAGE: det-ping IPv4 [arguments]")
+	//fmt.Println("IP address must be writen as IPv4 like 1.1.1.1 or 127.0.0.1.")
+	fmt.Println("Available arguments: ")
+	fmt.Println("-t [msec] or --timeout [msec]. (default -t 300)")
 }
 
 func main() {
+
+	argsGiven := os.Args[1:]
+	if len(argsGiven) < 1 {
+		printHelp()
+		return
+	}
+	if strings.Count(argsGiven[0], ".") != 3 {
+		printHelp()
+		return
+	} else {
+		ipAdr = argsGiven[0]
+	}
+	for i := 1; i < len(argsGiven); i += 2 {
+		if i+1 < len(argsGiven) {
+			fmt.Println(argsGiven[i], argsGiven[i+1])
+			switch argsGiven[i] {
+			case "-t":
+				fallthrough
+			case "--timeout":
+				fmt.Println("TIMEOUT: ", argsGiven[i+1])
+			default:
+				fmt.Println("Unrecongnized command:", argsGiven[i])
+				printHelp()
+				return
+			}
+		} else {
+			fmt.Println(argsGiven[i], "requires an argument.")
+			printHelp()
+			return
+		}
+	}
+
 	queueMin = Queue{}
 	queueHour = Queue{}
 	queue3Hour = Queue{}
@@ -234,6 +251,10 @@ func main() {
 	statsAll = make(map[int]int)
 	go log()
 	for {
-		test()
+		err := test()
+		if err != nil {
+			fmt.Println(err.Error())
+			break
+		}
 	}
 }
