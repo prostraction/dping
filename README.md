@@ -22,7 +22,10 @@ ICMP connection may require superuser privileges. If you encountered an error li
 sudo go run dping.go
 ```
 
-Usage: `dping IPv4 [arguments]`
+Usage: 
+```
+dping IPv4 [arguments]
+```
 
 Available arguments:
 -   `-t [msec]` or `--timeout [msec]`   Set timeout for packets.              (default msec = `300`)
