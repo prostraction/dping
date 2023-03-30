@@ -106,7 +106,10 @@ func colorizeLoss(value float64) string {
 	}
 
 }
-func colorizeLatency(value int) string {
+func colorizeLatency(value int, validPacketsCount int) string {
+	if validPacketsCount == 0 {
+		return aurora.Sprintf(aurora.Bold("%s ms"), aurora.Red("--"))
+	}
 	if value < 60 {
 		return aurora.Sprintf(aurora.Bold("%d ms"), aurora.Green(value))
 	} else if value < 120 {
@@ -124,6 +127,29 @@ func firstCommaPrint(firstOut *bool) string {
 	return ", "
 }
 
+func printDropValue(firstOut *bool, textInterval string, droppedPackets int, allPackets int) string {
+	msg := ""
+	msg += firstCommaPrint(firstOut)
+	msg += (textInterval + ": ")
+	stats := 100.
+	if allPackets > 0 {
+		stats = 100 * float64(droppedPackets) / float64(allPackets)
+	}
+	msg += colorizeLoss(stats)
+	if logShowPacketsCount {
+		msg += fmt.Sprintf(" (%d of %d)", droppedPackets, allPackets)
+	}
+	return msg
+}
+
+func printLatencyValue(firstOut *bool, textInteval string, avgLatency int, validPackets int) string {
+	msg := ""
+	msg += firstCommaPrint(firstOut)
+	msg += (textInteval + ": ")
+	msg += colorizeLatency(avgLatency, validPackets)
+	return msg
+}
+
 func printMsg(strTime string) {
 	var firstOut bool
 	firstOut = true
@@ -131,76 +157,77 @@ func printMsg(strTime string) {
 	msg += "[" + strTime + "]\t"
 	msg += "Loss: "
 	if logSecondEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "sec: "
-		secondStats := 100 * float64(p.droppedPacketsSecond) / float64(p.allPacketsSecond)
-		msg += colorizeLoss(secondStats)
-		if logShowPacketsCount {
-			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsSecond, p.allPacketsSecond)
-		}
+		msg += printDropValue(&firstOut, "sec", p.droppedPacketsSecond, p.allPacketsSecond)
 	}
 	if logMinuteEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "min: "
-		minStats := 100 * float64(p.droppedPacketsMin) / float64(p.allPacketsMin)
-		msg += colorizeLoss(minStats)
-		if logShowPacketsCount {
-			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsMin, p.allPacketsMin)
-		}
+		msg += printDropValue(&firstOut, "min", p.droppedPacketsMin, p.allPacketsMin)
 	}
 	if logHourEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "hour: "
-		hourStats := 100 * float64(p.droppedPacketsHour) / float64(p.allPacketsHour)
-		msg += colorizeLoss(hourStats)
-		if logShowPacketsCount {
-			msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsHour, p.allPacketsHour)
-		}
+		msg += printDropValue(&firstOut, "hour", p.droppedPacketsHour, p.allPacketsHour)
 	}
 	if log3HourEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "3 hours: "
-		threeHoursStats := 100 * float64(p.droppedPackets3Hour) / float64(p.allPackets3Hour)
-		msg += colorizeLoss(threeHoursStats)
-		if logShowPacketsCount {
-			msg += fmt.Sprintf(" (%d of %d)", p.droppedPackets3Hour, p.allPackets3Hour)
-		}
+		msg += printDropValue(&firstOut, "3 hours", p.droppedPackets3Hour, p.allPackets3Hour)
 	}
-	msg += firstCommaPrint(&firstOut)
-	msg += "all: "
-	allStats := 100 * float64(p.droppedPacketsAll) / float64(p.allPacketsAll)
-	msg += colorizeLoss(allStats)
-	if logShowPacketsCount {
-		msg += fmt.Sprintf(" (%d of %d)", p.droppedPacketsAll, p.allPacketsAll)
-	}
+	msg += printDropValue(&firstOut, "all", p.droppedPacketsAll, p.allPacketsAll)
 
 	firstOut = true
 	msg += "\tLatency: "
 	if logSecondEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "sec: "
-		msg += colorizeLatency(p.avgLatencySecond)
+		msg += printLatencyValue(&firstOut, "sec", p.avgLatencySecond, p.allPacketsSecond-p.droppedPacketsSecond)
 	}
 	if logMinuteEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "min: "
-		msg += colorizeLatency(p.avgLatencyMin)
+		msg += printLatencyValue(&firstOut, "min", p.avgLatencyMin, p.allPacketsMin-p.droppedPacketsMin)
 	}
 	if logHourEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "hour: "
-		msg += colorizeLatency(p.avgLatencyHour)
+		msg += printLatencyValue(&firstOut, "hour", p.avgLatencyHour, p.allPacketsHour-p.droppedPacketsHour)
 	}
 	if log3HourEnabled {
-		msg += firstCommaPrint(&firstOut)
-		msg += "3 hours: "
-		msg += colorizeLatency(p.avgLatency3Hour)
+		msg += printLatencyValue(&firstOut, "3 hours", p.avgLatency3Hour, p.allPackets3Hour-p.droppedPackets3Hour)
 	}
-	msg += firstCommaPrint(&firstOut)
-	msg += "all: "
-	msg += colorizeLatency(p.avgLatencyAll)
+	msg += printLatencyValue(&firstOut, "all", p.avgLatencyAll, p.allPacketsAll-p.droppedPacketsAll)
 
 	fmt.Fprintln(out, msg)
+}
+
+func remOldStats(stats map[int]int, q *Queue) {
+	remOldSec := q.Pop()
+	for k, v := range remOldSec {
+		if stats[k] > 0 {
+			stats[k] -= v
+		}
+	}
+}
+
+func calcStats(stats map[int]int, droppedPackets *int, allPackets *int, avgLatency *int) {
+	for k, v := range stats {
+		if k >= timeout {
+			*droppedPackets += v
+		} else {
+			*avgLatency += (k * v)
+		}
+		*allPackets += v
+	}
+	if (*allPackets - *droppedPackets) != 0 {
+		*avgLatency /= ((*allPackets) - (*droppedPackets))
+	}
+}
+
+func clearPacketLogs() {
+	p.allPacketsSecond = 0
+	p.allPacketsMin = 0
+	p.allPacketsHour = 0
+	p.allPackets3Hour = 0
+	p.allPacketsAll = 0
+	p.droppedPacketsSecond = 0
+	p.droppedPacketsMin = 0
+	p.droppedPacketsHour = 0
+	p.droppedPackets3Hour = 0
+	p.droppedPacketsAll = 0
+	p.avgLatencySecond = 0
+	p.avgLatencyMin = 0
+	p.avgLatencyHour = 0
+	p.avgLatency3Hour = 0
+	p.avgLatencyAll = 0
 }
 
 func log() {
@@ -211,142 +238,35 @@ func log() {
 		if tNow.Unix()-tLast.Unix() >= int64(second) {
 			mu.Lock()
 			secondsPassed++
-
 			statsSecond = dataSecond
 			queueMinute.Push(dataSecond)
 			queueHour.Push(dataSecond)
 			queue3Hour.Push(dataSecond)
-
 			if secondsPassed >= minute {
-				remOldSec := queueMinute.Pop()
-				for k, v := range remOldSec {
-					if statsMinute[k] > 0 {
-						statsMinute[k] -= v
-					}
-				}
+				remOldStats(statsMinute, &queueMinute)
 			}
 			if secondsPassed >= hour {
-				remOldSec := queueHour.Pop()
-				for k, v := range remOldSec {
-					if statsHour[k] > 0 {
-						statsHour[k] -= v
-					}
-				}
+				remOldStats(statsHour, &queueHour)
 			}
 			if secondsPassed >= 3*hour {
-				remOldSec := queue3Hour.Pop()
-				for k, v := range remOldSec {
-					if stats3Hour[k] > 0 {
-						stats3Hour[k] -= v
-					}
-				}
+				remOldStats(stats3Hour, &queue3Hour)
 			}
-
 			dataSecond = nil
 			mu.Unlock()
 			tLast = tNow
 		}
 		if tNow.Unix()-tIntervalCheck.Unix() >= int64(logInterval) {
-			//if tNow.Minute()-tMinCheck.Minute() != 0 {
 			mu.Lock()
 			strTime := tNow.Format(time.Stamp)
-
-			p.allPacketsSecond = 0
-			p.allPacketsMin = 0
-			p.allPacketsHour = 0
-			p.allPackets3Hour = 0
-			p.allPacketsAll = 0
-			p.droppedPacketsSecond = 0
-			p.droppedPacketsMin = 0
-			p.droppedPacketsHour = 0
-			p.droppedPackets3Hour = 0
-			p.droppedPacketsAll = 0
-			p.avgLatencySecond = 0
-			p.avgLatencyMin = 0
-			p.avgLatencyHour = 0
-			p.avgLatency3Hour = 0
-			p.avgLatencyAll = 0
-
-			for k, v := range statsSecond {
-				if k >= timeout {
-					p.droppedPacketsSecond += v
-				}
-				p.avgLatencySecond += k * v
-				p.allPacketsSecond += v
-			}
-			if p.allPacketsSecond != 0 {
-				p.avgLatencySecond /= p.allPacketsSecond
-			}
-
-			for k, v := range statsMinute {
-				if k >= timeout {
-					p.droppedPacketsMin += v
-				}
-				p.avgLatencyMin += k * v
-				p.allPacketsMin += v
-			}
-			if p.allPacketsMin != 0 {
-				p.avgLatencyMin /= p.allPacketsMin
-			}
-
-			for k, v := range statsHour {
-				if k >= timeout {
-					p.droppedPacketsHour += v
-				}
-				p.avgLatencyHour += k * v
-				p.allPacketsHour += v
-			}
-			if p.allPacketsHour != 0 {
-				p.avgLatencyHour /= p.allPacketsHour
-			}
-
-			for k, v := range stats3Hour {
-				if k >= timeout {
-					p.droppedPackets3Hour += v
-				}
-				p.avgLatency3Hour += k * v
-				p.allPackets3Hour += v
-			}
-			if p.avgLatency3Hour != 0 {
-				p.avgLatency3Hour /= p.allPackets3Hour
-			}
-
-			for k, v := range statsAll {
-				if k >= timeout {
-					p.droppedPacketsAll += v
-				}
-				p.avgLatencyAll += k * v
-				p.allPacketsAll += v
-			}
-			if p.allPacketsAll != 0 {
-				p.avgLatencyAll /= p.allPacketsAll
-			}
-
-			validPackets := false
-			switch logInterval {
-			case second:
-				if p.allPacketsSecond > 0 {
-					validPackets = true
-				}
-			case minute:
-				if p.allPacketsMin > 0 {
-					validPackets = true
-				}
-			case hour:
-				if p.allPacketsHour > 0 {
-					validPackets = true
-				}
-			}
-
-			if validPackets {
-				printMsg(strTime)
-			} else {
-				m := "[" + strTime + "]\t"
-				m += aurora.Sprintf(aurora.Bold("%s"), aurora.Red("No packets received! (Timeout set to "+strconv.Itoa(timeout)+" ms.)"))
-				fmt.Fprintln(out, m)
-			}
-			mu.Unlock()
+			clearPacketLogs()
+			calcStats(statsSecond, &p.droppedPacketsSecond, &p.allPacketsSecond, &p.avgLatencySecond)
+			calcStats(statsMinute, &p.droppedPacketsMin, &p.allPacketsMin, &p.avgLatencyMin)
+			calcStats(statsHour, &p.droppedPacketsHour, &p.allPacketsHour, &p.avgLatencyHour)
+			calcStats(stats3Hour, &p.droppedPackets3Hour, &p.allPackets3Hour, &p.avgLatency3Hour)
+			calcStats(statsAll, &p.droppedPacketsAll, &p.allPacketsAll, &p.avgLatencyAll)
+			printMsg(strTime)
 			tIntervalCheck = tNow
+			mu.Unlock()
 		}
 	}
 }
@@ -375,43 +295,44 @@ func test() error {
 	seq++
 	msgBytes, err := msg.Marshal(nil)
 	if err != nil {
+		connWrite.Close()
 		return err
 	}
 
 	tBegin := time.Now()
 	if _, err := connWrite.WriteTo(msgBytes, ipAddr); err != nil {
+		connWrite.Close()
 		return err
 	}
 
 	buf := make([]byte, 50)
 	n, _, errRead := connWrite.ReadFrom(buf)
-
-	if n == 0 {
-		// i/o timeout
-		return nil
-	}
-
-	if errRead != nil {
-		// i/o timeout, but may be other errors
-		return errRead
-	}
 	tLast := time.Now()
 	latency := tLast.UnixMilli() - tBegin.UnixMilli()
-	if latency >= int64(timeout) {
-		// i/o timeout
+	if n == 0 {
+		connWrite.Close()
 		return nil
 	}
+	if errRead != nil {
+		// i/o timeout, but may be other errors
+		connWrite.Close()
+		return errRead
+	}
+
 	mu.Lock()
 	if dataSecond == nil {
 		dataSecond = make(map[int]int)
 	}
-
 	dataSecond[int(latency)]++
 	statsHour[int(latency)]++
 	stats3Hour[int(latency)]++
 	statsMinute[int(latency)]++
 	statsAll[int(latency)]++
 	mu.Unlock()
+	//if latency >= int64(timeout) {
+	// i/o timeout
+	//return nil
+	//}
 	connWrite.Close()
 	return nil
 }
