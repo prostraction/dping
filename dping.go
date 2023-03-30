@@ -94,6 +94,8 @@ var statsAll map[int]int
 var mu sync.Mutex
 var out io.Writer
 
+var seq = 1
+
 func colorizeLoss(value float64) string {
 	if value < 1 {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Green(value))
@@ -320,8 +322,28 @@ func log() {
 				p.avgLatencyAll /= p.allPacketsAll
 			}
 
-			if p.allPacketsMin > 0 {
+			validPackets := false
+			switch logInterval {
+			case second:
+				if p.allPacketsSecond > 0 {
+					validPackets = true
+				}
+			case minute:
+				if p.allPacketsMin > 0 {
+					validPackets = true
+				}
+			case hour:
+				if p.allPacketsHour > 0 {
+					validPackets = true
+				}
+			}
+
+			if validPackets {
 				printMsg(strTime)
+			} else {
+				m := "[" + strTime + "]\t"
+				m += aurora.Sprintf(aurora.Bold("%s"), aurora.Red("No packets received! (Timeout set to "+strconv.Itoa(timeout)+" ms.)"))
+				fmt.Println(m)
 			}
 			mu.Unlock()
 			tIntervalCheck = tNow
@@ -335,10 +357,7 @@ func test() error {
 		return err
 	}
 
-	// Used const 150ms value for connection
-	// Overwise some strange behavior on lower values could happens
-	// Example: on 2ms timeout there is 50% packet loss, but in fact it must be 100%
-	connWrite.SetDeadline(time.Now().Add(time.Millisecond * 150))
+	connWrite.SetDeadline(time.Now().Add(time.Millisecond * time.Duration(timeout)))
 	ipAddr, err := net.ResolveIPAddr("ip4", ipAdr)
 	if err != nil {
 		return err
@@ -349,32 +368,44 @@ func test() error {
 		Code: 0,
 		Body: &icmp.Echo{
 			ID:   os.Getpid() & 0xffff,
-			Seq:  1,
-			Data: []byte("Hello, World!"),
+			Seq:  seq,
+			Data: []byte("0 1 2 3 4 5 6 7 8 9 10"),
 		},
 	}
+	seq++
 	msgBytes, err := msg.Marshal(nil)
 	if err != nil {
 		return err
 	}
 
+	tBegin := time.Now()
 	if _, err := connWrite.WriteTo(msgBytes, ipAddr); err != nil {
 		return err
 	}
 
-	tBegin := time.Now()
+	buf := make([]byte, 50)
+	n, _, errRead := connWrite.ReadFrom(buf)
 
-	buf := make([]byte, 1500)
-	n, _, _ := connWrite.ReadFrom(buf)
-	if n < 0 {
-		fmt.Println(n)
+	if n == 0 {
+		// i/o timeout
+		return nil
+	}
+
+	if errRead != nil {
+		// i/o timeout, but may be other errors
+		return errRead
 	}
 	tLast := time.Now()
+	latency := tLast.UnixMilli() - tBegin.UnixMilli()
+	if latency >= int64(timeout) {
+		// i/o timeout
+		return nil
+	}
 	mu.Lock()
 	if dataSecond == nil {
 		dataSecond = make(map[int]int)
 	}
-	latency := tLast.UnixMilli() - tBegin.UnixMilli()
+
 	dataSecond[int(latency)]++
 	statsHour[int(latency)]++
 	stats3Hour[int(latency)]++
