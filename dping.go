@@ -343,7 +343,7 @@ func log() {
 			} else {
 				m := "[" + strTime + "]\t"
 				m += aurora.Sprintf(aurora.Bold("%s"), aurora.Red("No packets received! (Timeout set to "+strconv.Itoa(timeout)+" ms.)"))
-				fmt.Println(m)
+				fmt.Fprintln(out, m)
 			}
 			mu.Unlock()
 			tIntervalCheck = tNow
