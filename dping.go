@@ -51,7 +51,7 @@ type PacketsLog struct {
 	droppedPackets3Hour  int
 	droppedPacketsAll    int
 	avgLatencySecond     int
-	avgLatencyMin        int
+	avgLatencyMinute     int
 	avgLatencyHour       int
 	avgLatency3Hour      int
 	avgLatencyAll        int
@@ -176,7 +176,7 @@ func printMsg(strTime string) {
 		msg += printLatencyValue(&firstOut, "sec", p.avgLatencySecond, p.allPacketsSecond-p.droppedPacketsSecond)
 	}
 	if logMinuteEnabled {
-		msg += printLatencyValue(&firstOut, "min", p.avgLatencyMin, p.allPacketsMin-p.droppedPacketsMin)
+		msg += printLatencyValue(&firstOut, "min", p.avgLatencyMinute, p.allPacketsMin-p.droppedPacketsMin)
 	}
 	if logHourEnabled {
 		msg += printLatencyValue(&firstOut, "hour", p.avgLatencyHour, p.allPacketsHour-p.droppedPacketsHour)
@@ -224,7 +224,7 @@ func clearPacketLogs() {
 	p.droppedPackets3Hour = 0
 	p.droppedPacketsAll = 0
 	p.avgLatencySecond = 0
-	p.avgLatencyMin = 0
+	p.avgLatencyMinute = 0
 	p.avgLatencyHour = 0
 	p.avgLatency3Hour = 0
 	p.avgLatencyAll = 0
@@ -260,7 +260,7 @@ func log() {
 			strTime := tNow.Format(time.Stamp)
 			clearPacketLogs()
 			calcStats(statsSecond, &p.droppedPacketsSecond, &p.allPacketsSecond, &p.avgLatencySecond)
-			calcStats(statsMinute, &p.droppedPacketsMin, &p.allPacketsMin, &p.avgLatencyMin)
+			calcStats(statsMinute, &p.droppedPacketsMin, &p.allPacketsMin, &p.avgLatencyMinute)
 			calcStats(statsHour, &p.droppedPacketsHour, &p.allPacketsHour, &p.avgLatencyHour)
 			calcStats(stats3Hour, &p.droppedPackets3Hour, &p.allPackets3Hour, &p.avgLatency3Hour)
 			calcStats(statsAll, &p.droppedPacketsAll, &p.allPacketsAll, &p.avgLatencyAll)
