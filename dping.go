@@ -96,6 +96,7 @@ var out io.Writer
 
 var seq = 1
 
+// colorizeLoss used for colorize loss value by some rules
 func colorizeLoss(value float64) string {
 	if value < 1 {
 		return aurora.Sprintf(aurora.Bold("%.2f%%"), aurora.Green(value))
@@ -106,6 +107,8 @@ func colorizeLoss(value float64) string {
 	}
 
 }
+
+// colorizeLatency used for colorize latency value by some rules
 func colorizeLatency(value int, validPacketsCount int) string {
 	if validPacketsCount == 0 {
 		return aurora.Sprintf(aurora.Bold("%s ms"), aurora.Red("--"))
@@ -119,6 +122,7 @@ func colorizeLatency(value int, validPacketsCount int) string {
 	}
 }
 
+// firstCommaPrint is used for detection of first item
 func firstCommaPrint(firstOut *bool) string {
 	if *firstOut {
 		*firstOut = false
@@ -127,6 +131,7 @@ func firstCommaPrint(firstOut *bool) string {
 	return ", "
 }
 
+// printDropValue colorize and print drop at right order
 func printDropValue(firstOut *bool, textInterval string, droppedPackets int, allPackets int) string {
 	msg := ""
 	msg += firstCommaPrint(firstOut)
@@ -142,6 +147,7 @@ func printDropValue(firstOut *bool, textInterval string, droppedPackets int, all
 	return msg
 }
 
+// printLatencyValue colorize and print latency at right order
 func printLatencyValue(firstOut *bool, textInteval string, avgLatency int, validPackets int) string {
 	msg := ""
 	msg += firstCommaPrint(firstOut)
@@ -150,6 +156,7 @@ func printLatencyValue(firstOut *bool, textInteval string, avgLatency int, valid
 	return msg
 }
 
+// printMsg prints one line of data including packet drops and latency
 func printMsg(strTime string) {
 	var firstOut bool
 	firstOut = true
@@ -189,6 +196,7 @@ func printMsg(strTime string) {
 	fmt.Fprintln(out, msg)
 }
 
+// remOldStats removes no longer actual second from stats range
 func remOldStats(stats map[int]int, q *Queue) {
 	remOldSec := q.Pop()
 	for k, v := range remOldSec {
@@ -198,6 +206,7 @@ func remOldStats(stats map[int]int, q *Queue) {
 	}
 }
 
+// calcStats calculate packet drop and avg latency
 func calcStats(stats map[int]int, droppedPackets *int, allPackets *int, avgLatency *int) {
 	for k, v := range stats {
 		if k >= timeout {
@@ -212,6 +221,7 @@ func calcStats(stats map[int]int, droppedPackets *int, allPackets *int, avgLaten
 	}
 }
 
+// clearPacketLogs perform clean of all printable data
 func clearPacketLogs() {
 	p.allPacketsSecond = 0
 	p.allPacketsMin = 0
@@ -230,6 +240,7 @@ func clearPacketLogs() {
 	p.avgLatencyAll = 0
 }
 
+// log performs stats calculation per second and print results per interval
 func log() {
 	tIntervalCheck := time.Now()
 	tLast := time.Now()
@@ -271,18 +282,18 @@ func log() {
 	}
 }
 
+// test sends ICMP packet and retrieve answer, collecting latency and drop results
 func test() error {
 	connWrite, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		return err
 	}
-
+	// default timeout = 300 ms
 	connWrite.SetDeadline(time.Now().Add(time.Millisecond * time.Duration(timeout)))
 	ipAddr, err := net.ResolveIPAddr("ip4", ipAdr)
 	if err != nil {
 		return err
 	}
-
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
 		Code: 0,
@@ -292,19 +303,18 @@ func test() error {
 			Data: []byte("0 1 2 3 4 5 6 7 8 9 10"),
 		},
 	}
+	// required, otherwise strange behavior occurs
 	seq++
 	msgBytes, err := msg.Marshal(nil)
 	if err != nil {
 		connWrite.Close()
 		return err
 	}
-
 	tBegin := time.Now()
 	if _, err := connWrite.WriteTo(msgBytes, ipAddr); err != nil {
 		connWrite.Close()
 		return err
 	}
-
 	buf := make([]byte, 50)
 	n, _, errRead := connWrite.ReadFrom(buf)
 	tLast := time.Now()
@@ -318,25 +328,22 @@ func test() error {
 		connWrite.Close()
 		return errRead
 	}
-
 	mu.Lock()
 	if dataSecond == nil {
 		dataSecond = make(map[int]int)
 	}
+	// if no timeout, write ping data
 	dataSecond[int(latency)]++
 	statsHour[int(latency)]++
 	stats3Hour[int(latency)]++
 	statsMinute[int(latency)]++
 	statsAll[int(latency)]++
 	mu.Unlock()
-	//if latency >= int64(timeout) {
-	// i/o timeout
-	//return nil
-	//}
 	connWrite.Close()
 	return nil
 }
 
+// printHelp used for incorrect call of dping.go
 func printHelp() {
 	fmt.Println("USAGE: dping IPv4 [arguments]")
 	fmt.Println("Available arguments: ")
