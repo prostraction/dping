@@ -132,27 +132,31 @@ func firstCommaPrint(firstOut *bool) string {
 }
 
 // printDropValue colorize and print drop at right order
-func printDropValue(firstOut *bool, textInterval string, droppedPackets int, allPackets int) string {
+func printDropValue(enabledLogSet bool, firstOut *bool, textInterval string, droppedPackets int, allPackets int) string {
 	msg := ""
-	msg += firstCommaPrint(firstOut)
-	msg += (textInterval + ": ")
-	stats := 100.
-	if allPackets > 0 {
-		stats = 100 * float64(droppedPackets) / float64(allPackets)
-	}
-	msg += colorizeLoss(stats)
-	if logShowPacketsCount {
-		msg += fmt.Sprintf(" (%d of %d)", droppedPackets, allPackets)
+	if enabledLogSet {
+		msg += firstCommaPrint(firstOut)
+		msg += (textInterval + ": ")
+		stats := 100.
+		if allPackets > 0 {
+			stats = 100 * float64(droppedPackets) / float64(allPackets)
+		}
+		msg += colorizeLoss(stats)
+		if logShowPacketsCount {
+			msg += fmt.Sprintf(" (%d of %d)", droppedPackets, allPackets)
+		}
 	}
 	return msg
 }
 
 // printLatencyValue colorize and print latency at right order
-func printLatencyValue(firstOut *bool, textInteval string, avgLatency int, validPackets int) string {
+func printLatencyValue(enabledLogSet bool, firstOut *bool, textInteval string, avgLatency int, validPackets int) string {
 	msg := ""
-	msg += firstCommaPrint(firstOut)
-	msg += (textInteval + ": ")
-	msg += colorizeLatency(avgLatency, validPackets)
+	if enabledLogSet {
+		msg += firstCommaPrint(firstOut)
+		msg += (textInteval + ": ")
+		msg += colorizeLatency(avgLatency, validPackets)
+	}
 	return msg
 }
 
@@ -163,35 +167,20 @@ func printMsg(strTime string) {
 	var msg = ""
 	msg += "[" + strTime + "]\t"
 	msg += "Loss: "
-	if logSecondEnabled {
-		msg += printDropValue(&firstOut, "sec", p.droppedPacketsSecond, p.allPacketsSecond)
-	}
-	if logMinuteEnabled {
-		msg += printDropValue(&firstOut, "min", p.droppedPacketsMin, p.allPacketsMin)
-	}
-	if logHourEnabled {
-		msg += printDropValue(&firstOut, "hour", p.droppedPacketsHour, p.allPacketsHour)
-	}
-	if log3HourEnabled {
-		msg += printDropValue(&firstOut, "3 hours", p.droppedPackets3Hour, p.allPackets3Hour)
-	}
-	msg += printDropValue(&firstOut, "all", p.droppedPacketsAll, p.allPacketsAll)
+	msg += printDropValue(logSecondEnabled, &firstOut, "sec", p.droppedPacketsSecond, p.allPacketsSecond)
+	msg += printDropValue(logMinuteEnabled, &firstOut, "min", p.droppedPacketsMin, p.allPacketsMin)
+	msg += printDropValue(logHourEnabled, &firstOut, "hour", p.droppedPacketsHour, p.allPacketsHour)
+	msg += printDropValue(log3HourEnabled, &firstOut, "3 hours", p.droppedPackets3Hour, p.allPackets3Hour)
+	msg += printDropValue(true, &firstOut, "all", p.droppedPacketsAll, p.allPacketsAll)
 
 	firstOut = true
 	msg += "\tLatency: "
-	if logSecondEnabled {
-		msg += printLatencyValue(&firstOut, "sec", p.avgLatencySecond, p.allPacketsSecond-p.droppedPacketsSecond)
-	}
-	if logMinuteEnabled {
-		msg += printLatencyValue(&firstOut, "min", p.avgLatencyMinute, p.allPacketsMin-p.droppedPacketsMin)
-	}
-	if logHourEnabled {
-		msg += printLatencyValue(&firstOut, "hour", p.avgLatencyHour, p.allPacketsHour-p.droppedPacketsHour)
-	}
-	if log3HourEnabled {
-		msg += printLatencyValue(&firstOut, "3 hours", p.avgLatency3Hour, p.allPackets3Hour-p.droppedPackets3Hour)
-	}
-	msg += printLatencyValue(&firstOut, "all", p.avgLatencyAll, p.allPacketsAll-p.droppedPacketsAll)
+
+	msg += printLatencyValue(logSecondEnabled, &firstOut, "sec", p.avgLatencySecond, p.allPacketsSecond-p.droppedPacketsSecond)
+	msg += printLatencyValue(logMinuteEnabled, &firstOut, "min", p.avgLatencyMinute, p.allPacketsMin-p.droppedPacketsMin)
+	msg += printLatencyValue(logHourEnabled, &firstOut, "hour", p.avgLatencyHour, p.allPacketsHour-p.droppedPacketsHour)
+	msg += printLatencyValue(log3HourEnabled, &firstOut, "3 hours", p.avgLatency3Hour, p.allPackets3Hour-p.droppedPackets3Hour)
+	msg += printLatencyValue(true, &firstOut, "all", p.avgLatencyAll, p.allPacketsAll-p.droppedPacketsAll)
 
 	fmt.Fprintln(out, msg)
 }
