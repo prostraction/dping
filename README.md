@@ -4,6 +4,8 @@
 
 Simple ICMP ping tester with packet loss shown while running.
 
+![dping1](https://user-images.githubusercontent.com/47314760/228662319-5ebdf4c5-61ef-49d2-a778-c048cc980aad.PNG)
+
 Get project:
 ```
 git clone https://github.com/prostraction/Detailed-Ping-Go
@@ -38,7 +40,3 @@ Available arguments:
 -   `-h` or `--hour`                    Enable logging hour drop stats.       (default enabled, if `i = h`)
 -   `-3h` or `--3hour`                  Enable logging 3 hour drop stats      (default disabled)
 -   `-p` or `--packets`                 Enable logging packets count stats.   (default disabled)
-
-
-
-![dping1](https://user-images.githubusercontent.com/47314760/228662319-5ebdf4c5-61ef-49d2-a778-c048cc980aad.PNG)
